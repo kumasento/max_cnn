@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<maxCompilerManager version="2">
+<enginePart internalEngineSubproject="max_cnn_EngineCode" isSrcBin="false" isUseDefaultSelected="false" outputLocation="/max_cnn_EngineCode/bin" projectName="max_cnn"/>
+<cpuPart internalCpuSubproject="max_cnn_CPUCode"/>
+<watchedFiles/>
+</maxCompilerManager>

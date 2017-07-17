@@ -1,0 +1,47 @@
+*.log
+
+*.d
+
+*.pxg
+
+*.dat
+
+*.maxchecksum
+*.checksum
+
+bin/
+*.class
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+
+# C and C++ generated files
+*.o
+
+# simulation
+*_sim
+
+# built dfe
+*_dfe
+
+# debug
+debug*
+
+# generated files
+MaxDeep/build/*
+!MaxDeep/build/Makefile
+
+# generated data
+*.bin
+
+# eclipse
+.settings/
+.classpath

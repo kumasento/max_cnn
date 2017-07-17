@@ -1,0 +1,79 @@
+package maxcnn;
+
+import com.maxeler.maxcompiler.v2.managers.BuildConfig;
+import com.maxeler.maxcompiler.v2.managers.custom.CustomManager;
+import com.maxeler.maxcompiler.v2.managers.custom.blocks.KernelBlock;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.CPUTypes;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.EngineInterface;
+import com.maxeler.maxcompiler.v2.managers.engine_interfaces.InterfaceParam;
+
+public class MaxCNNManager extends CustomManager {
+
+  private static final String CONV_KERNEL_NAME = "MaxCNNConvKernel";
+  private static final String POOL_KERNEL_NAME = "MaxCNNPoolKernel";
+  private static final int CONV_H = 10;
+  private static final int CONV_W = 10;
+  private static final int POOL_H = 8;
+  private static final int POOL_W = 8;
+  private static final int CONV_K = 3;
+  private static final int POOL_K = 2;
+
+  public MaxCNNManager(MaxCNNEngineParameters engineParameters) {
+    super(engineParameters);
+
+    // KernelBlock block = addKernel(new
+    // MaxCNNKernel(makeKernelParameters(s_kernelName)));
+    //
+    // for (String inputName: block.getAllInputs())
+    // block.getInput(inputName).connect(addStreamFromCPU(inputName));
+    // for (String outputName: block.getAllOutputs())
+    // addStreamToCPU(outputName).connect(block.getOutput(outputName));
+
+    KernelBlock convBlk = addKernel(new MaxCNNConvKernel(
+        makeKernelParameters(CONV_KERNEL_NAME),
+        CONV_H,
+        CONV_W,
+        CONV_K));
+    KernelBlock poolBlk = addKernel(new MaxCNNPoolKernel(
+        makeKernelParameters(POOL_KERNEL_NAME),
+        POOL_H,
+        POOL_W,
+        POOL_K));
+
+    convBlk.getInput("image") <== addStreamFromCPU("image");
+    poolBlk.getInput("image") <== convBlk.getOutput("convOut");
+    addStreamToCPU("logits") <== poolBlk.getOutput("poolOut");
+    
+    createSLiCinterface(modeDefault());
+
+    configBuild(engineParameters);
+  }
+
+  private static EngineInterface modeDefault() {
+    EngineInterface engine_interface = new EngineInterface();
+    CPUTypes type = CPUTypes.INT32;
+    int size = type.sizeInBytes();
+    
+    InterfaceParam N = engine_interface.addParam("N", CPUTypes.INT, "number of batches");
+
+    engine_interface.setTicks(CONV_KERNEL_NAME, N * CONV_H * CONV_W);
+    engine_interface.setTicks(POOL_KERNEL_NAME, N * POOL_H * POOL_W);
+    engine_interface.setStream("image", type, N * CONV_H * CONV_W * size);
+    engine_interface.setStream("logits", type, N * POOL_H * POOL_W / 4 * size);
+    return engine_interface;
+  }
+
+  private void configBuild(MaxCNNEngineParameters params) {
+    BuildConfig buildConfig = getBuildConfig();
+    buildConfig.setMPPRCostTableSearchRange(
+        params.getMPPRStartCT(),
+        params.getMPPREndCT());
+    buildConfig.setMPPRParallelism(params.getMPPRThreads());
+    buildConfig.setMPPRRetryNearMissesThreshold(params.getMPPRRetryThreshold());
+  }
+
+  public static void main(String[] args) {
+    MaxCNNManager manager = new MaxCNNManager(new MaxCNNEngineParameters(args));
+    manager.build();
+  }
+}

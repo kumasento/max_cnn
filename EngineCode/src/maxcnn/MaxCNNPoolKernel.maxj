@@ -1,0 +1,59 @@
+package maxcnn;
+
+import java.util.List;
+
+import com.maxeler.maxcompiler.v2.kernelcompiler.Kernel;
+import com.maxeler.maxcompiler.v2.kernelcompiler.KernelParameters;
+import com.maxeler.maxcompiler.v2.kernelcompiler.stdlib.core.CounterChain;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEType;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.base.DFEVar;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVector;
+import com.maxeler.maxcompiler.v2.kernelcompiler.types.composite.DFEVectorType;
+
+public class MaxCNNPoolKernel extends Kernel {
+
+  private static final DFEType type = dfeInt(32);
+  private static final DFEType indexType = dfeInt(8);
+  private static final int S = 2; // stride
+
+  public MaxCNNPoolKernel(KernelParameters params, int H, int W, int K) {
+    super(params);
+    
+    DFEVar image = io.input("image", type);
+
+    // create counter chain to create 2 nested counters:
+    // h for the index in height of the current pixel, and w in width
+    CounterChain chain = control.count.makeCounterChain();
+    DFEVar h = chain.addCounter(H, S).cast(indexType);  // stride start index in height
+    DFEVar sh = chain.addCounter(S, 1).cast(indexType); // index in height stride
+    DFEVar w = chain.addCounter(W, S).cast(indexType);  // stride start index in width
+    DFEVar sw = chain.addCounter(S, 1).cast(indexType); // index in width stride
+    DFEVar rh = sh + h;                                 // index in height
+    DFEVar rw = sw + w;                                 // index in width
+    
+    
+    DFEVectorType<DFEVar> windowType = new DFEVectorType<DFEVar>(type, K * K);
+    DFEVector<DFEVar> window = windowType.newInstance(this);
+    for (int i = 0; i < K; i ++)
+      for (int j = 0; j < K; j ++)
+        window[i * K + j] <== stream.offset(image, -((K-i-1) * W + (K-j-1)));
+    
+    DFEVar output = max(window.getElementsAsList());
+    // output is valid only when elements in window is valid and stride is finished.
+    DFEVar outputValid = rh >= K - 1 & rw >= K - 1 & sh === S - 1 & sw === S - 1;
+    io.output("poolOut", output, type, outputValid);
+  }
+
+  private DFEVar max(List<DFEVar> v) {
+    if (v.size() == 1)
+      return v.get(0);
+    if (v.size() == 2)
+      return (v.get(0) > v.get(1)) ? v.get(0) : v.get(1);
+
+    int N = (int) Math.ceil((double) v.size() / 2);
+    DFEVar x = max(v.subList(0, N));
+    DFEVar y = max(v.subList(N, v.size()));
+    return (x > y) ? x : y;
+  }
+
+}
